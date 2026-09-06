@@ -8,14 +8,14 @@
     "node": ">=20"
   },
   "bin": {
-    "line-gateway": "./dist/index.js",
-    "line-mcp": "./dist/mcp/stdio.js"
+    "line-gateway": "./dist/src/index.js",
+    "line-mcp": "./dist/src/mcp/stdio.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
     "dev": "tsx src/index.ts",
-    "mcp:stdio": "node dist/mcp/stdio.js",
+    "mcp:stdio": "node dist/src/mcp/stdio.js",
     "mcp:stdio:dev": "tsx src/mcp/stdio.ts",
     "test": "node --test dist/test/*.test.js",
     "check": "npm run build && npm run test"

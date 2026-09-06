@@ -41,6 +41,11 @@ google-chrome \
 
 Open LINE in that profile and log in.
 
+The adapter connects to Chrome through CDP; it does not discover a standalone
+LINE process. The LINE page must be an actual `chrome-extension://...` page in
+the remotely-debugged profile. A `view-source:chrome-extension://...` tab is a
+DevTools/source wrapper and is not a usable LINE target.
+
 ## Install
 
 ```bash
@@ -48,7 +53,9 @@ npm install
 npm run build
 ```
 
-Copy `.env.example` values into your environment as needed. The defaults are:
+Export `.env.example` values in the gateway process or process manager as
+needed. This prototype reads `process.env` directly and does not load a `.env`
+file automatically. The defaults are:
 
 ```text
 LINE_CDP_URL=http://127.0.0.1:9222
@@ -58,6 +65,12 @@ LINE_GATEWAY_PORT=8787
 ```
 
 `LINE_EXTENSION_ID` can be omitted; the adapter will then look for a Chrome extension page containing LINE-specific ARIA/DOM markers.
+
+Run the test suite before starting the gateway:
+
+```bash
+npm run check
+```
 
 ## Start the gateway
 
@@ -80,6 +93,30 @@ Event SSE:          http://127.0.0.1:8787/v1/events
 MCP HTTP:           http://127.0.0.1:8787/mcp
 ```
 
+### Codex CLI registration
+
+The stdio server is a proxy and requires the gateway to be running first. Add
+it to Codex with an absolute Node.js path so it does not depend on an
+interactive shell loading NVM:
+
+```bash
+codex mcp add line \
+  --env LINE_GATEWAY_URL=http://127.0.0.1:8787 \
+  -- /absolute/path/to/node /absolute/path/to/Line-Chrome-MCP/dist/src/mcp/stdio.js
+
+codex mcp get line
+```
+
+If Chrome uses another CDP port, restart the gateway with the matching URL:
+
+```bash
+LINE_CDP_URL=http://127.0.0.1:9223 npm start
+```
+
+The gateway port and the Chrome CDP port are independent. `LINE_GATEWAY_URL`
+points the stdio proxy at the gateway; `LINE_CDP_URL` points the gateway at
+Chrome.
+
 ## REST API
 
 ### Health / status
@@ -97,6 +134,11 @@ curl 'http://127.0.0.1:8787/v1/chats?limit=50'
 curl 'http://127.0.0.1:8787/v1/chats?q=Pai'
 curl 'http://127.0.0.1:8787/v1/chats?unread=true'
 ```
+
+`line_search_chats` and `/v1/chats?q=...` search chat titles only. They do not
+perform a global full-text search across every message. To inspect message
+content, first resolve a chat ID and then call the messages endpoint. If a name
+matches multiple chats, keep the candidates and ask the user to disambiguate.
 
 ### Messages
 
@@ -173,7 +215,7 @@ line_get_operation
 The stdio process does not own Chrome or LINE. It calls the already-running gateway over localhost, so multiple MCP hosts do not create competing LINE sessions.
 
 ```bash
-LINE_GATEWAY_URL=http://127.0.0.1:8787 node dist/mcp/stdio.js
+LINE_GATEWAY_URL=http://127.0.0.1:8787 node dist/src/mcp/stdio.js
 ```
 
 Example MCP host configuration:
@@ -183,7 +225,7 @@ Example MCP host configuration:
   "mcpServers": {
     "line": {
       "command": "node",
-      "args": ["/absolute/path/to/Line-Chrome-MCP/dist/mcp/stdio.js"],
+      "args": ["/absolute/path/to/Line-Chrome-MCP/dist/src/mcp/stdio.js"],
       "env": {
         "LINE_GATEWAY_URL": "http://127.0.0.1:8787"
       }
@@ -191,6 +233,37 @@ Example MCP host configuration:
   }
 }
 ```
+
+The compiled entry points live under `dist/src/` because the TypeScript project
+includes both `src/` and `test/` with `rootDir` set to `.`. Use the package
+scripts and `bin` entries rather than assuming `dist/index.js` or
+`dist/mcp/stdio.js`.
+
+## Diagnostics and troubleshooting
+
+Check all three layers independently:
+
+```bash
+curl http://127.0.0.1:9222/json/version
+curl http://127.0.0.1:9222/json/list
+curl http://127.0.0.1:8787/v1/health
+curl http://127.0.0.1:8787/v1/status
+```
+
+Interpret `/v1/status` as follows:
+
+- `ready: true`: the gateway found a LINE page and its expected DOM markers.
+- `connected: true, ready: false`: CDP is reachable, but the target is not a
+  usable LINE page. Check the profile, port, login state, and page URL.
+- `connected: false`: the gateway cannot connect to the configured CDP URL.
+
+The LINE extension normally appears as renderer/extension child processes of
+Chrome, not as a process named `line`. Process listings alone cannot prove that
+the gateway can use it; `/json/list` must expose the extension page and the
+gateway must be pointed at that same Chrome instance.
+
+For the incident-driven setup notes and recovery checklist, see
+[`docs/lessons-learned.md`](docs/lessons-learned.md).
 
 ## Authentication / remote binding
 
