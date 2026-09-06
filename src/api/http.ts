@@ -120,7 +120,11 @@ export async function startApiServer(gateway: MessagingGateway, config: GatewayC
     try {
       if (url.pathname === '/mcp') {
         authorize(req, config);
-        await mcpHandler(req, res);
+        if (!req.method) throw new GatewayError('INVALID_REQUEST', 'HTTP method is required.', 400);
+        await mcpHandler(
+          req as unknown as Parameters<typeof mcpHandler>[0],
+          res as unknown as Parameters<typeof mcpHandler>[1]
+        );
         return;
       }
 
