@@ -13,8 +13,8 @@ interface ChromeLineAdapterOptions {
 }
 
 export class ChromeLineAdapter implements LineAdapter {
-  private browser?: Browser;
-  private page?: Page;
+  private browser: Browser | undefined;
+  private page: Page | undefined;
 
   constructor(private readonly options: ChromeLineAdapterOptions) {}
 
