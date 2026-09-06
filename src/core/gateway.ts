@@ -6,7 +6,7 @@ import { OperationStore } from './operations.js';
 import { SerialQueue } from './queue.js';
 
 export class MessagingGateway {
-  private stopWatching?: () => void;
+  private stopWatching: (() => void) | undefined;
   readonly events = new EventBus();
   private readonly uiQueue = new SerialQueue();
   readonly operations = new OperationStore(this.uiQueue, this.events);
